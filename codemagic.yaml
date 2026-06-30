@@ -1,0 +1,96 @@
+# Codemagic CI/CD configuration for Wadrop (chhal_chrbti_man_lma)
+#
+# Why this file exists:
+# The native platform folders (ios/, android/) are NOT committed to this repo,
+# so a plain `flutter build` fails with "Did not find xcodeproj".
+# Each workflow below regenerates those folders with `flutter create .`
+# before building, then forces the store bundle id to com.wadrop.app.
+#
+# NOTE: code-signing assets (Apple certificates, Android keystore) must be
+# configured in the Codemagic UI — they cannot live in the repo. The steps
+# that need them are marked below.
+
+definitions:
+  scripts:
+    - &regenerate_platforms
+      name: Regenerate native platform folders
+      script: |
+        # Recreate ios/ and android/ from the existing pubspec/lib without
+        # touching Dart code. --org sets the base package, then we pin the
+        # exact store bundle id to com.wadrop.app on both platforms.
+        flutter create . \
+          --platforms=ios,android \
+          --org com.wadrop \
+          --project-name chhal_chrbti_man_lma
+
+        # ---- Force iOS bundle identifier -> com.wadrop.app ----
+        find ios -name project.pbxproj -print0 | xargs -0 sed -i '' \
+          -E 's/PRODUCT_BUNDLE_IDENTIFIER = com\.wadrop\.[A-Za-z0-9]+;/PRODUCT_BUNDLE_IDENTIFIER = com.wadrop.app;/g' || true
+
+        # ---- Force Android applicationId/namespace -> com.wadrop.app ----
+        GRADLE=android/app/build.gradle.kts
+        [ -f "$GRADLE" ] || GRADLE=android/app/build.gradle
+        sed -i '' -E 's/applicationId( =)? "[^"]*"/applicationId = "com.wadrop.app"/' "$GRADLE" || true
+        sed -i '' -E 's/namespace( =)? "[^"]*"/namespace = "com.wadrop.app"/' "$GRADLE" || true
+
+    - &flutter_pub_get
+      name: Install Flutter dependencies
+      script: flutter pub get
+
+workflows:
+  # ---------------------------------------------------------------------------
+  # iOS — App Store
+  # ---------------------------------------------------------------------------
+  ios-release:
+    name: iOS Release (App Store)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      # Configure an App Store Connect API key in Codemagic and put its name
+      # here (Codemagic UI -> Teams/Integrations -> Apple Developer Portal).
+      app_store_connect: AppStoreConnectKey
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.wadrop.app
+    scripts:
+      - *regenerate_platforms
+      - *flutter_pub_get
+      - name: Set up provisioning profiles
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Upload to TestFlight; set submit_to_app_store: true when ready.
+        submit_to_testflight: true
+
+  # ---------------------------------------------------------------------------
+  # Android — Google Play
+  # ---------------------------------------------------------------------------
+  android-release:
+    name: Android Release (Google Play)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      # Create an environment variable group named "keystore" in Codemagic
+      # with CM_KEYSTORE, CM_KEYSTORE_PASSWORD, CM_KEY_ALIAS, CM_KEY_PASSWORD
+      # to sign the release bundle.
+      groups:
+        - keystore
+    scripts:
+      - *regenerate_platforms
+      - *flutter_pub_get
+      - name: Build AAB
+        script: flutter build appbundle --release
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
