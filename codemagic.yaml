@@ -1,10 +1,8 @@
 # Codemagic CI/CD configuration for Wadrop (chhal_chrbti_man_lma)
 #
-# Why this file exists:
-# The native platform folders (ios/, android/) are NOT committed to this repo,
-# so a plain `flutter build` fails with "Did not find xcodeproj".
-# Each workflow below regenerates those folders with `flutter create .`
-# before building, then forces the store bundle id to com.wadrop.app.
+# The native platform folders (ios/, android/) are committed to the repo, so a
+# plain `flutter build` finds the Xcode/Gradle projects directly. The store
+# bundle id is already set to com.wadrop.app in both projects.
 #
 # NOTE: code-signing assets (Apple certificates, Android keystore) must be
 # configured in the Codemagic UI — they cannot live in the repo. The steps
@@ -12,28 +10,6 @@
 
 definitions:
   scripts:
-    - &regenerate_platforms
-      name: Regenerate native platform folders
-      script: |
-        # Recreate ios/ and android/ from the existing pubspec/lib without
-        # touching Dart code. --org sets the base package, then we pin the
-        # exact store bundle id to com.wadrop.app on both platforms.
-        flutter create . \
-          --platforms=ios,android \
-          --org com.wadrop \
-          --project-name chhal_chrbti_man_lma
-
-        # ---- Force iOS bundle identifier -> com.wadrop.app ----
-        # perl -i works identically on macOS and Linux (sed -i differs).
-        find ios -name project.pbxproj -print0 | xargs -0 perl -i -pe \
-          's/PRODUCT_BUNDLE_IDENTIFIER = com\.wadrop\.[A-Za-z0-9]+;/PRODUCT_BUNDLE_IDENTIFIER = com.wadrop.app;/g'
-
-        # ---- Force Android applicationId/namespace -> com.wadrop.app ----
-        GRADLE=android/app/build.gradle.kts
-        [ -f "$GRADLE" ] || GRADLE=android/app/build.gradle
-        perl -i -pe 's/applicationId(\s*=)?\s*"[^"]*"/applicationId = "com.wadrop.app"/' "$GRADLE"
-        perl -i -pe 's/namespace(\s*=)?\s*"[^"]*"/namespace = "com.wadrop.app"/' "$GRADLE"
-
     - &flutter_pub_get
       name: Install Flutter dependencies
       script: flutter pub get
@@ -58,7 +34,6 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.wadrop.app
     scripts:
-      - *regenerate_platforms
       - *flutter_pub_get
       - name: Set up provisioning profiles
         script: xcode-project use-profiles
@@ -89,7 +64,6 @@ workflows:
       groups:
         - keystore
     scripts:
-      - *regenerate_platforms
       - *flutter_pub_get
       - name: Build AAB
         script: flutter build appbundle --release
