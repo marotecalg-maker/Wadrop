@@ -24,14 +24,15 @@ definitions:
           --project-name chhal_chrbti_man_lma
 
         # ---- Force iOS bundle identifier -> com.wadrop.app ----
-        find ios -name project.pbxproj -print0 | xargs -0 sed -i '' \
-          -E 's/PRODUCT_BUNDLE_IDENTIFIER = com\.wadrop\.[A-Za-z0-9]+;/PRODUCT_BUNDLE_IDENTIFIER = com.wadrop.app;/g' || true
+        # perl -i works identically on macOS and Linux (sed -i differs).
+        find ios -name project.pbxproj -print0 | xargs -0 perl -i -pe \
+          's/PRODUCT_BUNDLE_IDENTIFIER = com\.wadrop\.[A-Za-z0-9]+;/PRODUCT_BUNDLE_IDENTIFIER = com.wadrop.app;/g'
 
         # ---- Force Android applicationId/namespace -> com.wadrop.app ----
         GRADLE=android/app/build.gradle.kts
         [ -f "$GRADLE" ] || GRADLE=android/app/build.gradle
-        sed -i '' -E 's/applicationId( =)? "[^"]*"/applicationId = "com.wadrop.app"/' "$GRADLE" || true
-        sed -i '' -E 's/namespace( =)? "[^"]*"/namespace = "com.wadrop.app"/' "$GRADLE" || true
+        perl -i -pe 's/applicationId(\s*=)?\s*"[^"]*"/applicationId = "com.wadrop.app"/' "$GRADLE"
+        perl -i -pe 's/namespace(\s*=)?\s*"[^"]*"/namespace = "com.wadrop.app"/' "$GRADLE"
 
     - &flutter_pub_get
       name: Install Flutter dependencies
