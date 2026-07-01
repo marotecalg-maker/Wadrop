@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)"
+    ]
+  }
+}

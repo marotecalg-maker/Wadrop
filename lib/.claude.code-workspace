@@ -1,0 +1,34 @@
+{
+	"folders": [
+		{
+			"path": "../.claude"
+		},
+		{
+			"path": "../.dart_tool"
+		},
+		{
+			"path": "../.idea"
+		},
+		{
+			"path": "../android"
+		},
+		{
+			"path": "../build"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../test"
+		},
+		{
+			"path": "../web"
+		},
+		{
+			"path": "../windows"
+		}
+	],
+	"settings": {
+		"debug.enableStatusBarColor": false
+	}
+}
