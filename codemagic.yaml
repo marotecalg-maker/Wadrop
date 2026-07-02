@@ -1,103 +1,34 @@
-# Codemagic CI/CD configuration for Wadrop (chhal_chrbti_man_lma)
-#
-# The native platform folders (ios/, android/) are committed to the repo, so a
-# plain `flutter build` finds the Xcode/Gradle projects directly. The store
-# bundle id is already set to com.wadrop.app in both projects.
-#
-# NOTE: code-signing assets (Apple certificates, Android keystore) must be
-# configured in the Codemagic UI — they cannot live in the repo. The steps
-# that need them are marked below.
-
-definitions:
-  scripts:
-    - &flutter_pub_get
-      name: Install Flutter dependencies
-      script: flutter pub get
-
 workflows:
-  # ---------------------------------------------------------------------------
-  # QUICK CHECK — no Apple account / no signing needed.
-  # Use this first to confirm the project builds end to end.
-  # ---------------------------------------------------------------------------
-  ios-build-check:
-    name: iOS Build Check (no signing)
-    instance_type: mac_mini_m2
-    max_build_duration: 60
-    environment:
-      flutter: stable
-      xcode: latest
-      cocoapods: default
-    scripts:
-      - *flutter_pub_get
-      - name: Build iOS without code signing
-        script: flutter build ios --release --no-codesign
-    artifacts:
-      - build/ios/iphoneos/*.app
-
-  android-build-check:
-    name: Android Build Check (debug APK)
-    instance_type: linux_x2
-    max_build_duration: 60
-    environment:
-      flutter: stable
-    scripts:
-      - *flutter_pub_get
-      - name: Build debug APK
-        script: flutter build apk --debug
-    artifacts:
-      - build/app/outputs/flutter-apk/*.apk
-
-  # ---------------------------------------------------------------------------
-  # iOS — App Store
-  # ---------------------------------------------------------------------------
-  ios-release:
-    name: iOS Release (App Store)
-    instance_type: mac_mini_m2
-    max_build_duration: 60
+  testFlight:
+    name: ELBOUNI
     integrations:
-      # Configure an App Store Connect API key in Codemagic and put its name
-      # here (Codemagic UI -> Teams/Integrations -> Apple Developer Portal).
-      app_store_connect: AppStoreConnectKey
+      app_store_connect: ELBOUNI
     environment:
       flutter: stable
-      xcode: latest
-      cocoapods: default
       ios_signing:
-        distribution_type: app_store
         bundle_identifier: com.wadrop.app
+        provisioning_profiles:
+          - Provisioning_wadrop
+        certificates:
+          - certificate2
     scripts:
-      - *flutter_pub_get
-      - name: Set up provisioning profiles
+      - name: Set up code signing settings on Xcode project
+        script: xcode-project use-profiles
+      - name: Get Flutter packages
+        script: flutter packages pub get
+      - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build IPA
-        script: |
-          flutter build ipa --release \
-            --export-options-plist=/Users/builder/export_options.plist
+        script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
+      email:
+        recipients:
+          - a.elbouni1996@gmail.com
+        notify:
+          success: true
+          failure: true
       app_store_connect:
         auth: integration
-        # Upload to TestFlight; set submit_to_app_store: true when ready.
         submit_to_testflight: true
-
-  # ---------------------------------------------------------------------------
-  # Android — Google Play
-  # ---------------------------------------------------------------------------
-  android-release:
-    name: Android Release (Google Play)
-    instance_type: linux_x2
-    max_build_duration: 60
-    environment:
-      flutter: stable
-      # Create an environment variable group named "keystore" in Codemagic
-      # with CM_KEYSTORE, CM_KEYSTORE_PASSWORD, CM_KEY_ALIAS, CM_KEY_PASSWORD
-      # to sign the release bundle.
-      groups:
-        - keystore
-    scripts:
-      - *flutter_pub_get
-      - name: Build AAB
-        script: flutter build appbundle --release
-    artifacts:
-      - build/app/outputs/bundle/release/*.aab
